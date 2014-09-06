@@ -46,6 +46,7 @@ public:
       len = 10;
       elip = true;
     }
+    std::cout << "Creating desc w/ len " << len << std::endl;
     _description = (char *)calloc(5 + len + (elip ? 3 : 0), sizeof(char));
     memcpy(_description, "('", 2);
     memcpy(&_description[2], _data, len);
