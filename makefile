@@ -10,9 +10,9 @@ clean:
 	rm -rf *.o
 	rm -rf tst
 
-tst: tst.cc.o lexer.hpp
+tst: tst.cc.lexer.o
 	$(CXX) $(filter %.o,$^) -o $@
 
-%.cc.o: %.cc
+%.cc.lexer.o: %.cc lexer.hpp
 	$(CXX) -c $< -o $@ $(CFLAGS)
 

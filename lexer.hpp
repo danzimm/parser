@@ -40,7 +40,7 @@ public:
   }
   char *description() {
     if (_description) free(_description);
-    size_t len = _length;
+    size_t len = _length, i;
     bool elip = false;
     if (len > 10) {
       len = 10;
@@ -50,6 +50,11 @@ public:
     _description = (char *)calloc(5 + len + (elip ? 3 : 0), sizeof(char));
     memcpy(_description, "('", 2);
     memcpy(&_description[2], _data, len);
+    for (i = 0; i < len; i++) {
+      if (_description[2 + i] == '\0') {
+        _description[2 + i] = '.';
+      }
+    }
     if (!elip) {
       memcpy(&_description[2+len], "')", 3);
     } else {
