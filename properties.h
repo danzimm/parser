@@ -14,7 +14,7 @@ protected: \
 public: \
   t& n() { t& out = _ ## n; { g }; return out; } \
   t n() const { t out = _ ## n; { g }; return out; } \
-  auto set_ ## n(t val) -> decltype(*this) { { s }; _ ## n = val; return (*this); }
+  auto& n(t val) { { s }; _ ## n = val; return (*this); }
 
 #define propg(t, n, g) \
 protected: \
@@ -22,7 +22,7 @@ protected: \
 public: \
   t& n() { t& out = _ ## n; { g }; return out; } \
   t n() const { t out = _ ## n; { g }; return out; } \
-  auto set_ ## n(t val) -> decltype(*this) { _ ## n = val; return (*this); }
+  auto& n(t val) { _ ## n = val; return (*this); }
 
 #define props(t, n, s) \
 protected: \
@@ -30,7 +30,7 @@ protected: \
 public: \
   t& n() { return _ ## n; } \
   t n() const { return _ ## n; } \
-  auto set_ ## n(t val) -> decltype(*this) { { s }; _ ## n = val; return (*this); }
+  auto& n(t val) { { s }; _ ## n = val; return (*this); }
 
 #define propro(t, n) \
 protected: \
@@ -44,7 +44,7 @@ protected: \
 public: \
   t& n() { return _ ## n; } \
   t n() const { return _ ## n; } \
-  auto set_ ## n(t val) -> decltype(*this) { _ ## n = val; return (*this); }
+  auto& n(t val) { _ ## n = val; return (*this); }
 
 #endif
 

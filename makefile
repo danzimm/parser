@@ -1,6 +1,6 @@
 
 CXX=clang++
-CFLAGS=-Wall -Werror -std=c++11 -O3
+CFLAGS=-Wall -Werror -std=c++1y -O3
 
 .PHONY: all clean
 
@@ -11,8 +11,8 @@ clean:
 	rm -rf tst
 
 tst: tst.cc.lexer.o
-	$(CXX) $(filter %.o,$^) -o $@
+	$(CXX) $(filter %.o,$^) -o $@ $(DEBUG_FLAGS)
 
 %.cc.lexer.o: %.cc lexer.hpp
-	$(CXX) -c $< -o $@ $(CFLAGS)
+	$(CXX) -c $< -o $@ $(CFLAGS) $(DEBUG_FLAGS)
 
