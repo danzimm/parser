@@ -248,7 +248,7 @@ public:
   }
   size_t lex(const char *data) {
     size_t i = 0;
-    while (i+1 < _sequenceLen) {
+    while (i+1 < _sequenceLen && i < strlen(data)) {
       if (!add_character(data[i])) {
         break;
       }
@@ -295,7 +295,7 @@ public:
   }
   size_t lex(const char *data) {
     size_t i = 0;
-    while (i+1 < _max_length) {
+    while (i+1 < _max_length && i < strlen(data)) {
       if (!add_character(data[i])) {
         break;
       }
@@ -338,7 +338,7 @@ public:
   }
   size_t lex(const char *data) {
     size_t i = 0;
-    while (true) {
+    while (i < strlen(data)) {
       if (!add_character(data[i])) {
         break;
       }
@@ -421,7 +421,7 @@ appendit:
   }
   size_t lex(const char *data) {
     size_t i = 0;
-    while (true) {
+    while (i < strlen(data)) {
       if (!add_character(data[i])) {
         break;
       }
@@ -501,7 +501,6 @@ public:
           token *tok = toker->reset();
           delete tok;
           i--;
-          used.push_back(t);
         }
       }
       used.push_back(t);
@@ -658,9 +657,11 @@ public:
         auto retval = lex->current_index();
         delete lex;
         return retval + 1;
+      } else {
+        std::cout << "Container failed to find ending character " << _end << std::endl;
       }
     }
-    std::cout << "Conatiner lexer stopped: " << lex->current_index() << " '" << lex->current_character() << "'" << std::endl;
+    std::cout << "Container lexer (" << _begin << "," << _end << ") stopped: " << lex->current_index() << " '" << lex->current_character() << "' with start '" << data[0] << "'" << std::endl;
     for (auto tok : toks) {
       delete tok;
     }

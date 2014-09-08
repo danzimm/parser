@@ -10,27 +10,6 @@ int main(int argc, const char *argv[]) {
   } else {
     dats = "hello world";
   }
-
-  /*
-  auto keytoker = tokenizer_table::register_tokenizer_creator([] (tokenizer_id id) {
-    auto *toker = new alphai_tokenizer(8);
-    toker->min_length(1);
-    return toker;
-  });
-  auto separtoker = tokenizer_table::register_tokenizer_creator([] (tokenizer_id id) {
-    return new sequence_tokenizer(":", 1);
-  });
-  auto istrtoker = tokenizer_table::register_tokenizer_creator([] (tokenizer_id id) {
-    return new istr_tokenizer();
-  });
-  auto strtoker = tokenizer_table::register_tokenizer_creator([=] (tokenizer_id id) {
-    return new container_tokenizer('"', '"', istrtoker, NULL);
-  });
-  auto objtoker = tokenizer_table::register_tokenizer_creator([=] (tokenizer_id id) {
-    return new container_tokenizer('{', '}', keytoker, ntoker, separtoker, wstoker, strtoker, id, NULL);
-  });
-  */
-  
   auto ntoker = tokenizer_table::register_tokenizer_creator([] (tokenizer_id id) {
     return new number_tokenizer();
   });
@@ -50,6 +29,23 @@ int main(int argc, const char *argv[]) {
     toker->type_description("comma");
     return toker;
   });
+  auto keytoker = tokenizer_table::register_tokenizer_creator([] (tokenizer_id id) {
+    auto *toker = new alphai_tokenizer(8);
+    toker->min_length(1);
+    return toker;
+  });
+  auto separtoker = tokenizer_table::register_tokenizer_creator([] (tokenizer_id id) {
+    return new sequence_tokenizer(":", 1);
+  });
+  auto istrtoker = tokenizer_table::register_tokenizer_creator([] (tokenizer_id id) {
+    return new istr_tokenizer();
+  });
+  auto strtoker = tokenizer_table::register_tokenizer_creator([=] (tokenizer_id id) {
+    return new container_tokenizer('"', '"', istrtoker, NULL);
+  });
+  auto objtoker = tokenizer_table::register_tokenizer_creator([=] (tokenizer_id id) {
+    return new container_tokenizer('{', '}', separtoker, arrsepartoker, keytoker, ntoker, strtoker, id, wstoker, NULL);
+  });
   auto tupletoker = tokenizer_table::register_tokenizer_creator([=] (tokenizer_id id) {
     auto toker = new container_tokenizer('(',')', hextoker, ntoker, arrsepartoker, wstoker, NULL);
     toker->type_description("tuple");
@@ -61,7 +57,7 @@ int main(int argc, const char *argv[]) {
     return toker;
   });
   
-  lexer *ler = new lexer(arrtoker, wstoker, NULL);
+  lexer *ler = new lexer(keytoker, ntoker, strtoker, separtoker, objtoker, arrtoker, tupletoker, wstoker, NULL);
   ler->lex(dats);
   auto toks = ler->tokens();
   if (!ler->finished()) {
