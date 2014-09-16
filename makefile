@@ -13,6 +13,6 @@ clean:
 tst: tst.cc.lexer.o
 	$(CXX) $(filter %.o,$^) -o $@ $(DEBUG_FLAGS)
 
-%.cc.lexer.o: %.cc lexer.hpp
+%.cc.lexer.o: %.cc lexer.hpp grammar.hpp properties.h
 	$(CXX) -c $< -o $@ $(CFLAGS) $(DEBUG_FLAGS)
 

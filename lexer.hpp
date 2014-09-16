@@ -18,6 +18,7 @@ enum token_type {
 
 class token {
 public:
+  using token_id = size_t;
   inline char char_to_hex(char c) {
     switch (c) {
       case 0:
@@ -79,6 +80,7 @@ protected:
       free(_data);
     }
   });
+  prop(token_id, id);
 
 public:
   token() : token(token_type::unknown) {}
@@ -137,10 +139,11 @@ public:
       _description = (char *)reallocf(_description, strlen(_description) + 6);
       memcpy(&_description[strlen(_description)], "'...,", 6);
     }
-    _description = (char *)reallocf(_description, strlen(_description) + strlen(_type_description) + 2);
-    strcpy(&_description[strlen(_description)], _type_description);
-    _description[strlen(_description)+1] = '\0';
-    _description[strlen(_description)] = ')';
+    char *typeidstr = NULL;
+    asprintf(&typeidstr, "%s - %zu)", _type_description, _id);
+    _description = (char *)reallocf(_description, strlen(_description) + strlen(typeidstr) + 1);
+    strcpy(&_description[strlen(_description)], typeidstr);
+    free(typeidstr);
     return _description;
   }
   auto& append(char c) {
@@ -159,6 +162,9 @@ class tokenizer {
     _tok->type_description(val);
   });
   prop(sequence_validator, validator);
+  props(token::token_id, tokid, {
+    _tok->id(val);
+  });
 
 public:
   tokenizer() : _tok(NULL), _type_description(NULL) {}
@@ -175,6 +181,9 @@ public:
     _tok = create_token();
     if (_type_description) {
       _tok->type_description(_type_description);
+    }
+    if (_tokid != 0) {
+      _tok->id(_tokid);
     }
     return tmp;
   }
@@ -197,7 +206,9 @@ namespace tokenizer_table {
   }
   tokenizer* create_tokenizer(tokenizer_id id) {
     if (is_tokenizer_creator_registered(id)) {
-      return tokenizer_creator_map[id](id);
+      tokenizer *toker = tokenizer_creator_map[id](id);
+      toker->tokid(id);
+      return toker;
     }
     std::cerr << "Warning: Attempted to create tokenizer with id `" << id << "'" << std::endl;
     return NULL;
@@ -443,7 +454,7 @@ public:
   lexer(tokenizer_id t, ...) : lexer() {
     va_list args;
     va_start(args, t);
-    add_tokenizers(t, args);
+    _add_tokenizers(t, args);
     va_end(args);
   }
   lexer(tokenizer_id_list list) : lexer() {
@@ -462,11 +473,11 @@ public:
   lexer& add_tokenizers(tokenizer_id id, ...) {
     va_list args;
     va_start(args, id);
-    add_tokenizers(id, args);
+    _add_tokenizers(id, args);
     va_end(args);
     return (*this);
   }
-  lexer& add_tokenizers(tokenizer_id t, va_list args) {
+  lexer& _add_tokenizers(tokenizer_id t, va_list args) {
     while (t != 0) {
       add_tokenizer(t);
       t = va_arg(args, tokenizer_id);
@@ -595,7 +606,7 @@ public:
   container_tokenizer(char begin, char end, tokenizer_id t, ...) : container_tokenizer(begin, end) {
     va_list args;
     va_start(args, t);
-    add_tokenizers(t, args);
+    _add_tokenizers(t, args);
     va_end(args);
   }
   ~container_tokenizer() {
@@ -627,11 +638,11 @@ public:
   container_tokenizer& add_tokenizers(tokenizer_id t, ...) {
     va_list args;
     va_start(args, t);
-    add_tokenizers(t, args);
+    _add_tokenizers(t, args);
     va_end(args);
     return (*this);
   }
-  container_tokenizer& add_tokenizers(tokenizer_id t, va_list args) {
+  container_tokenizer& _add_tokenizers(tokenizer_id t, va_list args) {
     while (t != 0) {
       add_tokenizer(t);
       t = va_arg(args, tokenizer_id);
@@ -658,10 +669,10 @@ public:
         delete lex;
         return retval + 1;
       } else {
-        std::cout << "Container failed to find ending character " << _end << std::endl;
+        std::cerr << "Container failed to find ending character " << _end << std::endl;
       }
     }
-    std::cout << "Container lexer (" << _begin << "," << _end << ") stopped: " << lex->current_index() << " '" << lex->current_character() << "' with start '" << data[0] << "'" << std::endl;
+    std::cerr << "Container lexer (" << _begin << "," << _end << ") stopped: " << lex->current_index() << " '" << lex->current_character() << "' with start '" << data[0] << "'" << std::endl;
     for (auto tok : toks) {
       delete tok;
     }
