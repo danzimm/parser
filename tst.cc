@@ -1,18 +1,46 @@
 
 #include <iostream>
 #include <cstdint>
+#include <fcntl.h>
+#include <unistd.h>
 #include "lexer.hpp"
 #include "grammar.hpp"
 #include "utils.hpp"
 
 #include "line_grammar.hpp"
 
+char *load_file(const char *path) {
+  int fd = open(path, O_RDONLY);
+  char *buff = (char *)calloc(1, sizeof(char));
+  buff[0] = '\0';
+  size_t len = 0;
+  char tmp[1024];
+  bzero(tmp, 1024);
+  while (true) {
+    size_t s = read(fd, tmp, 1024);
+    buff = (char *)reallocf(buff, 1 + len + s);
+    memcpy(buff + len, tmp, s);
+    buff[len + s] = '\0';
+    len += s;
+    if (s != 1024)
+      break;
+  }
+  return buff;
+}
+
 int main(int argc, const char *argv[]) {
   const char *dats;
-  if (argc > 1) {
-    dats = argv[1];
-  } else {
-    dats = "hello world";
+  switch (argc) {
+    case 3:
+      dats = load_file(argv[2]); // mem leak i know but this is tst program so ok
+      break;
+    case 2:
+      dats = argv[1];
+      break;
+    case 1:
+    default:
+      dats = "hello world";
+      break;
   }
   
   /*
@@ -80,38 +108,17 @@ int main(int argc, const char *argv[]) {
   }
   std::cout << std::endl;
   
-  auto* sepcomp = new line_grammar_component(separtoker);
-  sepcomp->validator([=](line_grammar_component& self, grammar_component::token_id_list& toks) {
-    auto begin = toks.begin();
-    auto end = toks.end();
-    auto id = self.id();
-    if (std::find(begin, end, id) != end) {
-      std::cerr << "Grammar error found a second : in the same line" << std::endl;
-      return false;
-    }
-    auto nkey = std::count(begin, end, keytoker);
-    if (nkey != 1) {
-      std::cerr << "Grammar error found the wrong number of keys before the `:': " << nkey << std::endl;
-      return false;
-    }
-    return true;
-  });
-  sepcomp->add_token_before(keytoker, 0);
-  auto* nlcomp = new line_grammar_component(nltoker);
-  nlcomp->validator([=](line_grammar_component& self, grammar_component::token_id_list& toks) {
-    auto begin = toks.begin();
-    auto end = toks.end();
-    auto loc = std::find(begin, end, separtoker);
-    if (loc != end) {
-      if (std::find(loc, end, keytoker) == end && std::find(loc, end, ntoker) == end) {
-        std::cerr << "Grammar error failed to find value for a key" << std::endl;
-        return false;
-      }
-    }
-    return true;
-  });
-  line_grammar *gram = new line_grammar(sepcomp, nlcomp, NULL);
-  gram->newlineid(nltoker);
+  auto* ncomp = new grammar_component(ntoker);
+  ncomp->add_ids_before(separtoker, 0).add_ids_after(nltoker, 0);
+  auto* nlcomp = new grammar_component(nltoker);
+  nlcomp->add_ids_before(ntoker, nltoker, keytoker, 0).add_ids_after(nltoker, keytoker);
+  auto* separcomp = new grammar_component(separtoker);
+  separcomp->add_ids_before(keytoker, 0).add_ids_after(ntoker, keytoker, 0);
+  auto* keycomp = new grammar_component(keytoker);
+  keycomp->add_ids_before(nltoker, separtoker, 0).add_ids_after(separtoker, nltoker, 0);
+
+  grammar *gram = new grammar(ncomp, nlcomp, separcomp, keycomp, 0);
+  gram->add_ignored_tokens(wstoker, 0);
   if (gram->check_token_list(toks)) {
     std::cout << "Passed grammar check" << std::endl;
   }
