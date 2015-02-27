@@ -269,6 +269,7 @@ public:
   }
 };
 
+// TODO: make allowed_characters compile time constant, unsure why is runtime
 class sequence_tokenizer : public tokenizer {
   propro(const char*, allowed_characters);
   props(size_t, max_length, {
@@ -350,6 +351,60 @@ public:
   size_t lex(const char *data) {
     size_t i = 0;
     while (i < strlen(data)) {
+      if (!add_character(data[i])) {
+        break;
+      }
+      i++;
+    }
+    return i;
+  }
+};
+
+class prefixed_tokenizer : public tokenizer {
+  using character_adder = std::function<bool(char)>;
+  propro(const char*, prefix);
+  props(size_t, max_length, {
+    char *tmp = _tok->data();
+    size_t tlen = strlen(tmp);
+    _tok->data(NULL); // TODO: this is causing a free on the pointer to tmp - need to fix, create copy first
+    if (val < tlen) {
+      tmp[val] = '\0';
+      tmp = (char *)reallocf(tmp, val+1);
+    }
+    _tok->data(tmp);
+  });
+  prop(size_t, min_length);
+  prop(character_adder, adder);
+private:
+  size_t _plen;
+public:
+  prefixed_tokenizer(const char *pre, character_adder a) : tokenizer(), _prefix(pre), _max_length(SIZE_MAX), _min_length(1), _adder(a) {
+    _tok = new token(token_type::sequence);
+    _plen = strlen(_prefix);
+  }
+  ~prefixed_tokenizer() {
+    delete _tok;
+  }
+  token* create_token() {
+    return new token(token_type::sequence);
+  }
+  bool add_character(char c) {
+    size_t len = strlen(_tok->data());
+    if (len < _plen && c != _prefix[len]) {
+      return false;
+    } else if (!_adder(c)) {
+      return false;
+    }
+    _tok->append(c);
+    return true;
+  }
+  bool full() {
+    size_t len = strlen(_tok->data());
+    return len >= _min_length && len <= _max_length;
+  }
+  size_t lex(const char *data) {
+    size_t i = 0;
+    while (i+1 < _max_length && i < strlen(data)) {
       if (!add_character(data[i])) {
         break;
       }

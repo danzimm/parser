@@ -1,6 +1,7 @@
 
 #include "properties.h"
 #include "lexer.hpp"
+#include <tuple>
 
 #ifndef __grammar_H
 #define __grammar_H
@@ -9,55 +10,58 @@ class grammar;
 
 class grammar_component {
 public:
-  using token_id_list = std::vector<token::token_id>;
+  using token_id = token::token_id;
+  using token_tuple = std::tuple<token_id, token_id>;
+  using token_tuple_list = std::vector<token_tuple>;
 
-  propro(token::token_id, id);
-  propro(token_id_list, allowed_before);
-  propro(token_id_list, allowed_after);
+  propro(token_id, id);
+  propro(token_tuple_list, allowed_around);
   prop(grammar*, gram);
 public:
-  grammar_component(token::token_id idd) : _id(idd) {}
+  grammar_component(token_id idd) : _id(idd) {}
   virtual ~grammar_component() {}
 
-  grammar_component& add_ids_before(token::token_id id, ...) {
-    va_list args;
-    va_start(args, id);
-    _add_ids(&_allowed_before, id, args);
-    va_end(args);
+  grammar_component& add_ids_around(token_id ida, token_id idb) {
+    _allowed_around.push_back(token_tuple(ida, idb));
     return (*this);
   }
-
-  grammar_component& add_ids_after(token::token_id id, ...) {
-    va_list args;
-    va_start(args, id);
-    _add_ids(&_allowed_after, id, args);
-    va_end(args);
+  grammar_component& add_ids_around(token_tuple tup) {
+    _allowed_around.push_back(tup);
     return (*this);
   }
-  
-  grammar_component& _add_ids(token_id_list *list, token::token_id id, va_list args) {
-    while (id != 0) {
-      list->push_back(id);
-      id = va_arg(args, token::token_id);
+  grammar_component& add_ids_combination(std::vector<token_id> befores, std::vector<token_id> afters) {
+    for (auto btokid : befores) {
+      for (auto atokid : afters) {
+        add_ids_around(btokid, atokid);
+      }
     }
     return (*this);
   }
 
-  virtual bool check_token_sequence(token* tok, token::token_id before, token::token_id after) {
-    return (before == 0 || std::find(_allowed_before.begin(), _allowed_before.end(), before) != _allowed_before.end()) && (after == 0 || std::find(_allowed_after.begin(), _allowed_after.end(), after) != _allowed_after.end()); 
+  virtual bool check_token_sequence(token* tok, token_id before, token_id after) {
+    bool allowed = false;
+    for (token_tuple tup : _allowed_around) {
+      token_id ida = std::get<0>(tup);
+      token_id idb = std::get<1>(tup);
+      if (ida == before && idb == after) {
+        allowed = true;
+        break;
+      }
+    }
+    return allowed;
   }
 };
 
 class grammar {
 public:
-
+  
+  using token_id = token::token_id;
   using grammar_component_map = std::map<token::token_id, grammar_component*>;
-  using token_id_list = grammar_component::token_id_list;
+  using token_id_list = std::vector<token_id>;
 
   propro(grammar_component_map, components);
   propro(token_id_list, ignored_tokens);
   
-// TODO: grammar comp should only allow before and after in pairs. i.e. shouldnt be able to have a keytoken just sittin alone, needs to either come after new line and before separ token or after separ and before new line, not before and after newline nor nefore and after separ. This is in general a major problem, unsure how to fix it. We shouldn't allow : to occur more than once per line as well. In general there needs to be some sort of better checking going on here...
 public:
   grammar() {} 
   grammar(grammar_component *comp, ...) {
@@ -174,6 +178,7 @@ protected:
         return false;
       }
     } else {
+      std::cerr << "Failed to find a component for " << itself->description() << std::endl;
       return false; // if for some reason you didn't create a grammar_component for this token then you should be shamed
     }
     return true;

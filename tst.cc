@@ -6,8 +6,41 @@
 #include "lexer.hpp"
 #include "grammar.hpp"
 #include "utils.hpp"
+#include <cassert>
 
-#include "line_grammar.hpp"
+struct linked_dict {
+  char *key;
+  enum {
+    str_type,
+    num_type
+  } type;
+  union {
+    char *str;
+    double num;
+  };
+  linked_dict *next, *previous;
+  linked_dict(char *k) : str(NULL) {
+    key = (char *)calloc(strlen(k)+1, sizeof(char));
+    strcpy(key, k);
+  }
+  ~linked_dict() {
+    if (type == str_type && str != NULL)
+      free(str);
+    if (key != NULL)
+      free(key);
+  }
+  linked_dict& set_val(char *s) {
+    type = str_type;
+    str = (char *)calloc(strlen(s)+1,sizeof(char));
+    strcpy(str, s);
+    return (*this);
+  }
+  linked_dict& set_val(double n) {
+    type = num_type;
+    num = n;
+    return (*this);
+  }
+};
 
 char *load_file(const char *path) {
   int fd = open(path, O_RDONLY);
@@ -42,45 +75,6 @@ int main(int argc, const char *argv[]) {
       dats = "hello world";
       break;
   }
-  
-  /*
-  auto ntoker = tokenizer_table::register_tokenizer_creator([] (tokenizer_id id) {
-    return create_object(number_tokenizer, (), );
-  });
-  auto wstoker = tokenizer_table::register_tokenizer_creator([] (tokenizer_id id) {
-    return create_object(whitespace_tokenizer, (SIZE_MAX), obj->min_length(1).type_description("whitespace"));
-  });
-  auto hextoker = tokenizer_table::register_tokenizer_creator([] (tokenizer_id id) {
-    return create_object(sequence_tokenizer, ("abcdefABCDEF0123456789", 6), obj->type_description("hex color"));
-  });
-  auto arrsepartoker = tokenizer_table::register_tokenizer_creator([] (tokenizer_id id) {
-    return create_object(sequence_tokenizer, (",", 1), obj->type_description("comma"));
-  });
-  auto keytoker = tokenizer_table::register_tokenizer_creator([] (tokenizer_id id) {
-    return create_object(alphai_tokenizer, (8), obj->min_length(1));
-  });
-  auto separtoker = tokenizer_table::register_tokenizer_creator([] (tokenizer_id id) {
-    return create_object(sequence_tokenizer, (":", 1), );
-  });
-  auto istrtoker = tokenizer_table::register_tokenizer_creator([] (tokenizer_id id) {
-    return create_object(istr_tokenizer, (), );
-  });
-  auto strtoker = tokenizer_table::register_tokenizer_creator([=] (tokenizer_id id) {
-    return create_object(container_tokenizer, ('"', '"', istrtoker, NULL), );
-  });
-  auto tupletoker = tokenizer_table::register_tokenizer_creator([=] (tokenizer_id id) {
-    return create_object(container_tokenizer, ('(', ')', hextoker, ntoker, arrsepartoker, wstoker, NULL), obj->type_description("tuple"));
-  });
-  auto arrtoker = tokenizer_table::register_tokenizer_creator([=] (tokenizer_id id) {
-    return create_object(container_tokenizer, ('[',']', tupletoker, arrsepartoker, strtoker, wstoker, NULL), obj->type_description("array"));
-  });
-  auto objtoker = tokenizer_table::register_tokenizer_creator([=] (tokenizer_id id) {
-    return create_object(container_tokenizer, ('{','}', separtoker, arrsepartoker, keytoker, ntoker, strtoker, id, arrtoker, wstoker, NULL), );
-  });
-
-  lexer *ler = new lexer(keytoker, ntoker, strtoker, separtoker, objtoker, arrtoker, tupletoker, wstoker, NULL);
-  */
-
   auto ntoker = tokenizer_table::register_tokenizer_creator([] (tokenizer_id id) {
     return create_object(number_tokenizer, (), );
   });
@@ -96,8 +90,10 @@ int main(int argc, const char *argv[]) {
   auto keytoker = tokenizer_table::register_tokenizer_creator([] (tokenizer_id id) {
     return create_object(alphai_tokenizer, (8), obj->min_length(1));
   });
-  lexer *ler = new lexer(keytoker, ntoker, separtoker, wstoker, nltoker, NULL);
-
+  auto comtoker = tokenizer_table::register_tokenizer_creator([] (tokenizer_id id) {
+    return create_object(prefixed_tokenizer, ("#", [] (char c) { return c != '\r' && c != '\n'; }), );
+  });
+  lexer *ler = new lexer(keytoker, ntoker, separtoker, wstoker, nltoker, comtoker, NULL);
   ler->lex(dats);
   auto toks = ler->tokens();
   if (!ler->finished()) {
@@ -107,22 +103,51 @@ int main(int argc, const char *argv[]) {
     std::cout << tok->description() << " ";
   }
   std::cout << std::endl;
-  
   auto* ncomp = new grammar_component(ntoker);
-  ncomp->add_ids_before(separtoker, 0).add_ids_after(nltoker, 0);
+  ncomp->add_ids_combination({separtoker}, {nltoker, comtoker, 0});
   auto* nlcomp = new grammar_component(nltoker);
-  nlcomp->add_ids_before(ntoker, nltoker, keytoker, 0).add_ids_after(nltoker, keytoker);
+  nlcomp->add_ids_combination({0, ntoker, nltoker, keytoker, comtoker}, {0, nltoker, keytoker, comtoker});
   auto* separcomp = new grammar_component(separtoker);
-  separcomp->add_ids_before(keytoker, 0).add_ids_after(ntoker, keytoker, 0);
+  separcomp->add_ids_combination({keytoker}, {ntoker, keytoker});
   auto* keycomp = new grammar_component(keytoker);
-  keycomp->add_ids_before(nltoker, separtoker, 0).add_ids_after(separtoker, nltoker, 0);
-
-  grammar *gram = new grammar(ncomp, nlcomp, separcomp, keycomp, 0);
+  keycomp->add_ids_around(nltoker, separtoker).add_ids_combination({separtoker}, {nltoker, 0, comtoker});
+  auto* comcomp = new grammar_component(comtoker);
+  comcomp->add_ids_combination({ntoker, nltoker, keytoker, 0}, {nltoker, 0});
+  grammar *gram = new grammar(ncomp, nlcomp, separcomp, keycomp, comcomp, 0);
   gram->add_ignored_tokens(wstoker, 0);
   if (gram->check_token_list(toks)) {
     std::cout << "Passed grammar check" << std::endl;
   }
-  
+  size_t i;
+  linked_dict* previous = NULL;
+  linked_dict* current = NULL;
+  for (i = 0; i < toks.size(); i++) {
+    auto tok = toks[i];
+    auto id = tok->id();
+    if (id == nltoker || id == comtoker || id == wstoker)
+      continue;
+    if (current == NULL) {
+      assert(id == keytoker);
+      current = new linked_dict(tok->data());
+      if (previous)
+        previous->next = current;
+      current->previous = previous;
+    } else {
+      if (id == separtoker)
+        continue;
+      current->set_val(tok->data());
+      previous = current;
+      current = NULL;
+    }
+  }
+  current = previous;
+  while (current->previous) {
+    current = current->previous;
+  }
+  while(current) {
+    std::cout << current->key << " : " << current->str << std::endl;
+    current = current->next;
+  }
   return 0;
 }
 
