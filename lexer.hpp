@@ -72,13 +72,16 @@ public:
   }
 
 protected:
-  char *_description;
+  propro(char*, description)
   prop(token_type, type);
-  prop(const char*, type_description);
+  props(const char*, type_description, {
+    _reset_description();
+  });
   props(char*, data, {
     if (_data) {
       free(_data);
     }
+    _reset_description();
   });
   prop(token_id, id);
 
@@ -94,8 +97,15 @@ public:
     }
     if (_description) free(_description);
   }
+  virtual void _reset_description() {
+    if (_description) {
+      free(_description);
+      _description = NULL;
+    }
+  }
   virtual char *description() {
-    if (_description) free(_description);
+    if (_description)
+      return _description;
     size_t len = strlen(_data), i, j;
     bool elip = false;
     if (len > 10) {
@@ -151,6 +161,7 @@ public:
     _data = (char *)reallocf(_data, len + 2);
     _data[len+1] = '\0';
     _data[len] = c;
+    _reset_description();
     return (*this);
   }
 };

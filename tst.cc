@@ -103,21 +103,25 @@ int main(int argc, const char *argv[]) {
     std::cout << tok->description() << " ";
   }
   std::cout << std::endl;
-  auto* ncomp = new grammar_component(ntoker);
-  ncomp->add_ids_combination({separtoker}, {nltoker, comtoker, 0});
-  auto* nlcomp = new grammar_component(nltoker);
-  nlcomp->add_ids_combination({0, ntoker, nltoker, keytoker, comtoker}, {0, nltoker, keytoker, comtoker});
-  auto* separcomp = new grammar_component(separtoker);
-  separcomp->add_ids_combination({keytoker}, {ntoker, keytoker});
-  auto* keycomp = new grammar_component(keytoker);
-  keycomp->add_ids_around(nltoker, separtoker).add_ids_combination({separtoker}, {nltoker, 0, comtoker});
-  auto* comcomp = new grammar_component(comtoker);
-  comcomp->add_ids_combination({ntoker, nltoker, keytoker, 0}, {nltoker, 0});
-  grammar *gram = new grammar(ncomp, nlcomp, separcomp, keycomp, comcomp, 0);
-  gram->add_ignored_tokens(wstoker, 0);
-  if (gram->check_token_list(toks)) {
-    std::cout << "Passed grammar check" << std::endl;
-  }
+
+  auto* component = new grammar_component();
+  component->initializer([=] (grammar_component* comp, grammar_component::comp_meta_data& meta_data, grammar_component::token_id id) {
+    meta_data["withinline"] = "n";
+    meta_data["separated"] = "n";
+    return id != ntoker && id != separtoker;
+  }).validator([=] (grammar_component* comp, grammar_component::comp_meta_data& meta_data, grammar_component::token_id id) {
+    if (id == wstoker)
+      return true;
+    if (meta_data["withinline"][0] == 'n') {
+      if (id != nltoker) {
+        meta_data["withinline"] = "y";
+        return id == comtoker || id == keytoker;
+      }
+    } else {
+      
+    }
+  });
+
   size_t i;
   linked_dict* previous = NULL;
   linked_dict* current = NULL;
